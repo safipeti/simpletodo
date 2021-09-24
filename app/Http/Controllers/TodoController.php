@@ -5,88 +5,67 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreTodoRequest;
 use App\Models\Todo;
 use App\Services\TodoService;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cookie;
 
 class TodoController extends Controller
 {
-
-    /**
-     * @var TodoService
-     */
-    private $todoService;
+    private TodoService $todoService;
 
     public function __construct(TodoService $todoService)
     {
-        $this->middleware('auth');
         $this->todoService = $todoService;
     }
 
-
-    public function index()
+    public function index(Request $request): View
     {
-        $active_only = isset($_COOKIE['active_only']) ? $_COOKIE['active_only'] : false;
+        $search = $request->get('search', '');
 
-        $filters = isset($_GET['search']) ? $_GET['search'] : null;
-
-        $todos = $this->todoService->loadTodos($active_only, $filters);
-        return view('todos.index', ['todos' => $todos]);
+        return view('todos.index', [
+            'todos' => $this->todoService->get($request->cookie('active_only', false), $search),
+            'search' => $search,
+        ]);
     }
 
-
-    public function create()
+    public function create(): View
     {
         return view('todos.create');
     }
 
-
-    public function store(StoreTodoRequest $request)
+    public function store(StoreTodoRequest $request): RedirectResponse
     {
-
-        $todo = $this->todoService->addTodo(array_merge(['user_id' => Auth::id()], $request->all()));
-
+        $this->todoService->create(['user_id' => Auth::id()] + $request->all());
 
         return redirect(route('todos.index'));
     }
 
-
-    public function show($id)
+    public function edit(int $id): View
     {
-        //
+      return  view('todos.edit', [
+          'todo' => $this->todoService->find($id)
+      ]);
     }
 
-
-    public function edit($id)
+    public function update(StoreTodoRequest $request, int $id): RedirectResponse
     {
-      $todo = $this->todoService->loadTodo($id);
-
-
-      if(!$todo)
-          return redirect(route('todos.index'))->with('error', 'Ilyen feladat nincs');
-
-      return  view('todos.edit', ['todo' => $todo]);
-
-    }
-
-
-    public function update(StoreTodoRequest $request, $id)
-    {
-        $todo = $this->todoService->updateTodo(Auth::user(), array_merge(['id' => $id], $request->all()));
+        $todo = Todo::query()->findOrFail($id);
+        $todo = $this->todoService->update($todo, $request->except('_token', '_method'));
 
         return redirect(route('todos.edit', $todo->id))->with('success', 'Sikeres módosítás.');
     }
 
-
-    public function destroy($id)
+    public function destroy(int $id): RedirectResponse
     {
-        if($this->todoService->delete(Auth::user(), $id))
-        {
-            return redirect()->route('todos.index')->with('success', 'Sikeres törlés');
-        }
-        else
-        {
-            return redirect()->route('todos.index')->with('error', 'Sikertelen törlés');
-        }
+        $this->todoService->delete($id);
+
+        return redirect()->route('todos.index')->with('success', 'Sikeres törlés');
+    }
+
+    public function setCookie(Request $request): RedirectResponse
+    {
+        return redirect()->route('todos.index')
+            ->withCookie(cookie('active_only', !$request->cookie('active_only'), 1));
     }
 }

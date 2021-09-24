@@ -6,37 +6,22 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreTodoRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
-    public function authorize()
+    public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array
-     */
-    public function rules()
+    public function rules(): array
     {
-        $rules =  [
+        return [
             'name' => 'required',
             'description' => 'required',
-            'due' => 'required|after_or_equal:'.date('Y-m-d')
+            'due' => 'required|after_or_equal:'.date('Y-m-d'),
+            'upload_file' => 'mimes:pdf,xml,jpg,jpeg,txt|max:5000',
         ];
-        if(request()->hasFile('upload_file'))
-        {
-            $rules['upload_file'] = 'mimes:pdf,xml,jpg,jpeg,txt|max:5000';
-        }
-
-        return $rules;
     }
 
-    public function messages()
+    public function messages(): array
     {
         return [
           'name.required' => 'A név megadása kötelező',

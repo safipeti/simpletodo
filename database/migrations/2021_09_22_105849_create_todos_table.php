@@ -19,7 +19,7 @@ class CreateTodosTable extends Migration
             $table->string('name');
             $table->tinyText('description');
             $table->date('due');
-            $table->integer('done')->default(0);
+            $table->boolean('done')->default(false);
             $table->timestamps();
         });
     }

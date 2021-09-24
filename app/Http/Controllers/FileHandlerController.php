@@ -3,19 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\Upload;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class FileHandlerController extends Controller
 {
-    public function download($file_name)
+    public function download(int $id): BinaryFileResponse
     {
-        $file = Upload::where('filename', $file_name)->first();
+        $file = Upload::query()->findOrFail($id);
 
-        if ($file)
-        {
-            $stored_file = storage_path('app\uploaded_files' .'\\' . $file_name);
-            return Response::download($stored_file, $file->orig_filename);
-        }
+        return Response::download(storage_path('app/uploaded_files/'.$file->filename), $file->orig_filename);
     }
 }
