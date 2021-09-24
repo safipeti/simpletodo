@@ -2,170 +2,90 @@
 
 namespace App\Services;
 
-
 use App\Models\Todo;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 class TodoService
 {
-    private $uploadService;
+    private UploadService $uploadService;
 
     public function __construct()
     {
         $this->uploadService = new UploadService();
     }
 
-    public function addTodo($data)
+    public function create(array $data): Model
     {
-        extract($data);
+        /** @var Todo $todo */
+        $todo = Todo::query()->make($data);
 
-        $todo = new Todo();
-        $todo->name = $name;
-        $todo->description = $description;
-        $todo->due = $due;
+        User::query()->find($data['user_id'])->todos()->save($todo);
 
+        $this->save($todo, $data);
 
-        $user = User::find($user_id);
+        return $todo;
+    }
 
-        $todo = $user->todos()->save($todo);
+    public function get(bool $isActive, string $search): Collection
+    {
+        $todoQuery = Todo::query()
+            ->where('user_id', '=', Auth::id())
+            ->orderBy('done')
+            ->orderBy('due', 'desc')
+            ;
+
+        if($isActive) {
+            $todoQuery->where('done', '=', 0);
+        }
+
+        if ($search) {
+            $texts = explode(' ', $search);
+
+            $todoQuery->where(function (Builder $where) use ($texts) {
+                foreach ($texts as $text) {
+                    $where->orWhereRaw(sprintf("name LIKE '%%%s%%' OR description LIKE '%%%s%%'", $text, $text));
+                }
+            });
+        }
+
+        return $todoQuery->get();
+    }
+
+    public function find(int $id): Model
+    {
+        return Todo::query()->with('uploadedFiles')->findOrFail($id);
+    }
+
+    public function update(Todo $todo, array $data): Model
+    {
+        $data['done'] = empty($data['done']) ? 0 : 1;
+        $todo->update($data);
+
+        $this->save($todo, $data);
+
+        return $todo;
+    }
+
+    private function save(Todo $todo, array $data): void
+    {
         if(!empty($data['upload_file']))
         {
             $file = $this->uploadService->upload($data['upload_file']);
 
             $this->uploadService->addUpload($todo, $file);
         }
-
-
-
-        return $todo;
-
     }
 
-    public function loadTodos($active_nly, $filters = null)
+    public function delete(int $id): void
     {
-        $user = Auth::user();
-        $q = 'select * from todos WHERE user_id = ' . Auth::id() ;
-        if($active_nly)
-        {
-            $q .= ' AND done = 0 ';
-        }
-        if($filters)
-        {
-            $i = 0;
-            $texts = explode(' ', $filters);
-            $textsCount = count($texts);
+        $todo = Todo::query()->find($id);
 
-
-            $search = '';
-
-            foreach ($texts as $text)
-            {
-
-                if($textsCount -1 > $i)
-                {
-                    if(!$active_nly)
-                    {
-                        $search .= " AND (name like '%" . $text . "%' OR description like '%" . $text . "%') AND ";
-                    }
-                    else
-                    {
-                        $search .= " (name like '%" . $text . "%' OR description like '%" . $text . "%') AND ";
-                    }
-
-
-                }
-                else
-                {
-                    if(!$active_nly)
-                    {
-                        $search .= " AND (name like '%" . $text . "%' OR description like '%" . $text . "%')  ";
-                    }
-                    else
-                    {
-                        $search .= " AND (name like '%" . $text . "%' OR description like '%" . $text . "%')  ";
-                    }
-                }
-
-                $i++;
-            }
-
-            $q .= $search;
-
-//            if($search != '')
-//            {
-//                $q .= $active_nly ? ' AND ' . $search :  " where " . $search;
-//
-//            }
-
-            $q .= ' ORDER BY done DESC, due DESC';
-
-
-
-
-
-
-
-        }
-//dd($q);
-        $todos = DB::select($q);
-
-        return $todos;
-
-        if($active_nly)
-        {
-            $todos = $user->todos()->where(['done'=> 0]);
-        }
-
-        return $todos->orderBy('done')->orderBy('due', 'DESC')->get();
-
-    }
-
-    public function loadTodo($id)
-    {
-        return Todo::where(['id' => $id, 'user_id' => Auth::id()])->first();
-    }
-
-    public function updateTodo(User $user, $data)
-    {
-        extract($data);
-
-        $todo = $user->todos()->where('id', $id)->first();
-        if(!$todo)
-            return false;
-
-        $todo->update([
-           'name' => $name,
-            'description' => $description,
-            'due' => $due,
-            'done' => !empty($done) ? 1 : 0
-        ]);
-
-        if(!empty($data['upload_file']))
-        {
-            $file = $this->uploadService->upload($data['upload_file']);
-
-            $this->uploadService->addUpload($todo, $file);
-        }
-
-        return $todo;
-
-    }
-
-    public function delete(User $user, $id)
-    {
-        $todo = $user->todos()->where('id', $id)->first();
-
-        if ($todo)
-        {
+        if ($todo) {
             $todo->forceDelete();
-            return true;
-        }
-        else
-        {
-            return false;
         }
     }
-
 }

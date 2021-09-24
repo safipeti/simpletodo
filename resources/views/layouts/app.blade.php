@@ -27,11 +27,11 @@
                 </a>
                 <form
                     method="post"
-                    action="{{route('todos.setCookies')}}"
+                    action="{{ route('todos.setCookie') }}"
                 >
                     {{ csrf_field() }}
                     @auth
-                    <button class="btn btn-primary">{{ (!isset($_COOKIE['active_only']) OR (isset($_COOKIE['active_only']) AND !$_COOKIE['active_only']) ) ? 'Csak az aktívakat' : 'Mindet'}}</button>
+                    <button class="btn btn-primary">{{ Cookie::get('active_only') ? 'Csak az aktívakat' : 'Mindet'}}</button>
                     @endauth
                 </form>
                 <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{{ __('Toggle navigation') }}">
